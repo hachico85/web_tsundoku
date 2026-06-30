@@ -1,0 +1,1537 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>積読ビンゴ</title>
+  <style>
+    :root {
+      --paper: #fbfbf6;
+      --paper-deep: #f1eadb;
+      --ink: #1f1f1f;
+      --muted: #7b785b;
+      --wood: #9a6a3f;
+      --wood-mid: #7a4f2e;
+      --wood-dark: #4f2f1b;
+      --shelf-back: #d8c3a3;
+      --leaf: #1f8d61;
+      --leaf-soft: #b4d9ca;
+      --leaf-dark: #176847;
+      --gold: #f5d03e;
+      --clay: #db5331;
+      --cream: #fbfbf6;
+      --line: rgba(79, 47, 27, 0.16);
+      --shadow: 0 8px 32px rgba(47, 33, 19, 0.16);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "A+EqpB-游ゴシック体 Pr6N M", "Yu Gothic Medium", "YuGothic", "Hiragino Sans", sans-serif;
+      background:
+        radial-gradient(circle at 88% 7%, rgba(180, 217, 202, 0.62), transparent 24%),
+        radial-gradient(circle at 8% 18%, rgba(245, 208, 62, 0.26), transparent 21%),
+        linear-gradient(180deg, var(--paper) 0%, #f8f7ee 56%, #efe3ce 100%);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    .app {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 34px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .title-wrap {
+      padding: 28px 0 14px;
+    }
+
+    .eyebrow {
+      width: max-content;
+      margin: 0 0 10px;
+      padding: 8px 16px;
+      color: var(--cream);
+      background: var(--leaf);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.8rem, 8vw, 6.8rem);
+      line-height: 0.96;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-shadow: 0 8px 22px rgba(79, 47, 27, 0.16);
+    }
+
+    .subtitle {
+      max-width: 680px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      line-height: 1.8;
+    }
+
+    .shelf-meter {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 18px;
+      border: 0;
+      border-radius: var(--radius);
+      background: rgba(251, 251, 246, 0.78);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+
+    .meter-item {
+      min-height: 88px;
+      padding: 12px;
+      border-radius: 14px;
+      color: var(--cream);
+      background: linear-gradient(135deg, var(--wood-mid), var(--wood-dark));
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .meter-item:nth-child(2) {
+      background: var(--leaf);
+    }
+
+    .meter-item:nth-child(3) {
+      color: var(--ink);
+      background: var(--gold);
+    }
+
+    .meter-label {
+      font-size: 0.78rem;
+      color: currentColor;
+      opacity: 0.8;
+    }
+
+    .meter-value {
+      font-size: 1.9rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .board-panel,
+    .side-panel {
+      border: 0;
+      border-radius: var(--radius);
+      background: rgba(251, 251, 246, 0.86);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+
+    .board-panel {
+      padding: 24px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 400;
+    }
+
+    .status {
+      min-height: 42px;
+      padding: 13px 16px;
+      border-left: 5px solid var(--leaf);
+      border-radius: 12px;
+      background: rgba(180, 217, 202, 0.24);
+      color: var(--leaf-dark);
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0 22px;
+    }
+
+    .btn {
+      min-height: 44px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      color: var(--cream);
+      background: var(--wood-dark);
+      box-shadow: 0 4px 16px rgba(79, 47, 27, 0.16);
+      font-weight: 700;
+      transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+      box-shadow: 0 8px 24px rgba(79, 47, 27, 0.18);
+    }
+
+    .btn.secondary {
+      color: var(--ink);
+      background: var(--gold);
+    }
+
+    .btn.leaf {
+      background: var(--leaf);
+    }
+
+    .btn.ghost {
+      color: var(--wood-dark);
+      background: transparent;
+      border: 1px solid rgba(79, 47, 27, 0.28);
+      box-shadow: none;
+    }
+
+    .bingo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      min-height: 660px;
+      padding: 18px;
+      border-radius: 20px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.14), transparent 18%, rgba(0,0,0,0.08) 100%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.09) 0 7px, rgba(0,0,0,0.035) 7px 14px),
+        linear-gradient(135deg, var(--wood), var(--wood-dark));
+      box-shadow:
+        inset 0 0 0 8px rgba(79, 47, 27, 0.32),
+        inset 0 0 0 14px rgba(255, 255, 255, 0.12),
+        0 18px 44px rgba(79, 47, 27, 0.24);
+    }
+
+    .cell {
+      position: relative;
+      min-height: 198px;
+      padding: 14px 14px 12px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 6px;
+      background:
+        linear-gradient(90deg, rgba(48, 29, 16, 0.2), transparent 20%, rgba(255, 255, 255, 0.11) 50%, rgba(48, 29, 16, 0.16)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 8px, rgba(0,0,0,0.035) 8px 16px),
+        linear-gradient(180deg, #d7bd96, var(--shelf-back));
+      box-shadow:
+        inset 9px 0 13px rgba(48, 29, 16, 0.22),
+        inset -8px 0 12px rgba(255, 255, 255, 0.13),
+        inset 0 -14px 0 rgba(79, 47, 27, 0.32),
+        inset 0 -18px 0 rgba(255, 255, 255, 0.08);
+      transition: transform 180ms ease, filter 180ms ease;
+    }
+
+    .cell::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.16)),
+        linear-gradient(90deg, var(--wood-mid), var(--wood-dark));
+      box-shadow: 0 -8px 18px rgba(48, 29, 16, 0.2);
+      z-index: 0;
+    }
+
+    .cell > div {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .cell:not(.empty):hover {
+      transform: translateY(-3px);
+      filter: saturate(1.04) brightness(1.02);
+    }
+
+    .cell.empty {
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+      background:
+        linear-gradient(90deg, rgba(48, 29, 16, 0.12), transparent 25%, rgba(255,255,255,0.12)),
+        repeating-linear-gradient(90deg, rgba(79, 47, 27, 0.06) 0 12px, transparent 12px 24px),
+        #d9c4a4;
+    }
+
+    .book-cover {
+      position: relative;
+      width: min(78%, 150px);
+      margin: 0 auto;
+      aspect-ratio: 4 / 5.45;
+      overflow: hidden;
+      border-radius: 4px;
+      background: linear-gradient(145deg, #7d4b2d, #d9b56d);
+      box-shadow:
+        -8px 10px 16px rgba(48, 29, 16, 0.24),
+        0 2px 0 rgba(255, 255, 255, 0.36) inset;
+      transform: perspective(500px) rotateY(-3deg);
+    }
+
+    .book-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .fake-cover {
+      width: 100%;
+      height: 100%;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #fff9e7;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.18) 0 12%, transparent 12%),
+        linear-gradient(145deg, #6c4128, #1f8d61 62%, #f5d03e);
+    }
+
+    .fake-title {
+      font-size: clamp(0.9rem, 1.6vw, 1.25rem);
+      font-weight: 800;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .fake-author {
+      font-size: 0.78rem;
+      line-height: 1.35;
+      opacity: 0.86;
+      overflow-wrap: anywhere;
+    }
+
+    .book-meta {
+      margin-top: 8px;
+      padding: 8px 8px 10px;
+      border-radius: 10px;
+      background: rgba(251, 251, 246, 0.74);
+      box-shadow: 0 6px 14px rgba(48, 29, 16, 0.08);
+    }
+
+    .book-title {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      font-weight: 700;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .book-author {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .cell.opened::after {
+      content: "読了!";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--cream);
+      background: rgba(31, 141, 97, 0.74);
+      font-size: clamp(1.8rem, 4vw, 3.4rem);
+      font-weight: 900;
+      transform: rotate(-10deg);
+      text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.24);
+    }
+
+    .cell.line-hit {
+      box-shadow:
+        0 0 0 4px rgba(245, 208, 62, 0.42),
+        inset 9px 0 13px rgba(48, 29, 16, 0.22),
+        inset -8px 0 12px rgba(255, 255, 255, 0.13),
+        inset 0 -14px 0 rgba(79, 47, 27, 0.32),
+        inset 0 -18px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .side-panel {
+      padding: 18px;
+      position: sticky;
+      top: 16px;
+    }
+
+    .notice {
+      margin: 0 0 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(180, 217, 202, 0.24);
+      color: var(--leaf-dark);
+      line-height: 1.7;
+      font-size: 0.92rem;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .mini-book {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(251, 251, 246, 0.68);
+    }
+
+    .mini-thumb {
+      width: 42px;
+      aspect-ratio: 4 / 5.3;
+      overflow: hidden;
+      border-radius: 6px;
+      background: var(--wood);
+    }
+
+    .mini-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .mini-title {
+      margin: 0;
+      font-size: 0.88rem;
+      font-weight: 800;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .mini-author {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.76rem;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(42, 30, 19, 0.62);
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .dialog {
+      width: min(900px, 100%);
+      max-height: min(88vh, 860px);
+      overflow: auto;
+      border: 1px solid rgba(255, 250, 240, 0.42);
+      border-radius: 16px;
+      background: var(--cream);
+      box-shadow: 0 24px 90px rgba(0, 0, 0, 0.36);
+    }
+
+    .dialog.small {
+      width: min(560px, 100%);
+    }
+
+    .dialog-head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251, 251, 246, 0.95);
+      backdrop-filter: blur(8px);
+    }
+
+    .dialog-head h2 {
+      margin: 0;
+      font-size: 1.28rem;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      color: var(--ink);
+      background: var(--leaf-soft);
+      font-size: 1.35rem;
+      line-height: 1;
+    }
+
+    .dialog-body {
+      padding: 18px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px dashed var(--line);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--wood-dark);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid rgba(92, 56, 32, 0.26);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fff;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--leaf);
+      box-shadow: 0 0 0 3px rgba(31, 141, 97, 0.16);
+    }
+
+    .results,
+    .library-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .result-card,
+    .library-card {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(251, 251, 246, 0.7);
+    }
+
+    .result-card .mini-thumb,
+    .library-card .mini-thumb {
+      width: 58px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+
+    .card-sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .danger {
+      background: var(--clay);
+      color: var(--cream);
+    }
+
+    .empty-message {
+      padding: 18px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .confirm-book {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+    }
+
+    .confirm-book .book-cover {
+      width: 132px;
+    }
+
+    .celebrate {
+      display: grid;
+      gap: 12px;
+    }
+
+    .celebrate-title {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      color: var(--leaf-dark);
+      line-height: 1.15;
+    }
+
+    .line-books {
+      display: grid;
+      gap: 8px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 20;
+      max-width: min(390px, calc(100% - 32px));
+      padding: 12px 14px;
+      border-radius: 7px;
+      color: var(--cream);
+      background: var(--wood-dark);
+      box-shadow: var(--shadow);
+      transform: translateY(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+      line-height: 1.55;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        position: static;
+      }
+
+      .bingo-grid {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        width: min(100% - 18px, 1180px);
+        padding-top: 12px;
+      }
+
+      .shelf-meter,
+      .actions,
+      .manual-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bingo-grid {
+        gap: 6px;
+      }
+
+      .board-panel {
+        padding: 10px;
+      }
+
+      .cell {
+        min-height: 168px;
+        padding: 6px;
+      }
+
+      .book-title {
+        font-size: 0.78rem;
+      }
+
+      .book-author {
+        font-size: 0.68rem;
+      }
+
+      .form-grid,
+      .result-card,
+      .library-card,
+      .confirm-book {
+        grid-template-columns: 1fr;
+      }
+
+      .result-card .mini-thumb,
+      .library-card .mini-thumb,
+      .confirm-book .book-cover {
+        width: 96px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero" aria-labelledby="appTitle">
+      <div class="title-wrap">
+        <p class="eyebrow">罪悪感じゃなくて、ビンゴにしよう。</p>
+        <h1 id="appTitle">積読<br>ビンゴ</h1>
+        <p class="subtitle">読めない本棚を、遊べる本棚に。登録した積読から9冊をランダムに並べて、読めた本を開いていきます。</p>
+      </div>
+      <div class="shelf-meter" aria-label="本棚とビンゴの状態">
+        <div class="meter-item">
+          <span class="meter-label">登録した本</span>
+          <strong class="meter-value" id="bookCount">0</strong>
+        </div>
+        <div class="meter-item">
+          <span class="meter-label">開いたマス</span>
+          <strong class="meter-value" id="openedCount">0</strong>
+        </div>
+        <div class="meter-item">
+          <span class="meter-label">達成ライン</span>
+          <strong class="meter-value" id="lineCount">0</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="board-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">現在のビンゴカード</h2>
+        </div>
+        <div class="status" id="statusText">ビンゴを作るには、9冊以上の本を登録してください。</div>
+        <div class="actions">
+          <button class="btn leaf" id="openAdd">本を追加</button>
+          <button class="btn" id="openLibrary">本棚を編集</button>
+          <button class="btn secondary" id="createBingo">ビンゴを作る</button>
+          <button class="btn ghost" id="resetBingo">リセット</button>
+        </div>
+        <div class="bingo-grid" id="bingoGrid" aria-live="polite"></div>
+      </div>
+
+      <aside class="side-panel">
+        <p class="notice">タイトル検索にはNDLサーチAPI、書誌と書影の取得にはopenBDを利用します。本棚と読了状態はこのブラウザ内だけに保存されます。</p>
+        <h2 class="panel-title">本棚</h2>
+        <div class="mini-list" id="miniList"></div>
+      </aside>
+    </section>
+  </main>
+
+  <div class="modal" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+    <div class="dialog">
+      <div class="dialog-head">
+        <h2 id="addTitle">本を追加</h2>
+        <button class="icon-btn" data-close="addModal" aria-label="閉じる">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label>本のタイトルで検索
+            <input id="searchInput" type="search" placeholder="例：論語、吾輩は猫である">
+          </label>
+          <label>作者名 任意
+            <input id="authorInput" type="search" placeholder="例：夏目漱石">
+          </label>
+          <button class="btn leaf" id="searchBooks">検索</button>
+        </div>
+        <div id="searchMessage" class="empty-message" style="display:none;"></div>
+        <div class="results" id="searchResults"></div>
+
+        <div class="manual-grid">
+          <label>手入力タイトル
+            <input id="manualTitle" type="text" placeholder="例：読みたい本">
+          </label>
+          <label>著者
+            <input id="manualAuthor" type="text" placeholder="例：著者名">
+          </label>
+          <label>表紙URL 任意
+            <input id="manualCover" type="url" placeholder="https://...">
+          </label>
+          <button class="btn secondary" id="addManual">追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="libraryModal" role="dialog" aria-modal="true" aria-labelledby="libraryTitle">
+    <div class="dialog">
+      <div class="dialog-head">
+        <h2 id="libraryTitle">本棚を編集</h2>
+        <button class="icon-btn" data-close="libraryModal" aria-label="閉じる">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="library-list" id="libraryList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="dialog small">
+      <div class="dialog-head">
+        <h2 id="confirmTitle">読了確認</h2>
+        <button class="icon-btn" data-close="confirmModal" aria-label="閉じる">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="confirm-book" id="confirmBook"></div>
+        <div class="actions" style="grid-template-columns: 1fr 1fr;">
+          <button class="btn leaf" id="markRead">読了する</button>
+          <button class="btn ghost" data-close="confirmModal">まだ読んでいない</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="bingoModal" role="dialog" aria-modal="true" aria-labelledby="bingoTitle">
+    <div class="dialog small">
+      <div class="dialog-head">
+        <h2 id="bingoTitle">ビンゴ達成</h2>
+        <button class="icon-btn" data-close="bingoModal" aria-label="閉じる">×</button>
+      </div>
+      <div class="dialog-body celebrate" id="bingoMessage"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const BOOKS_KEY = "tsundoku_books";
+    const STATE_KEY = "tsundoku_bingo_state";
+    const BINGO_LINES = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
+      [0, 4, 8],
+      [2, 4, 6]
+    ];
+
+    const els = {
+      bookCount: document.getElementById("bookCount"),
+      openedCount: document.getElementById("openedCount"),
+      lineCount: document.getElementById("lineCount"),
+      statusText: document.getElementById("statusText"),
+      bingoGrid: document.getElementById("bingoGrid"),
+      miniList: document.getElementById("miniList"),
+      libraryList: document.getElementById("libraryList"),
+      addModal: document.getElementById("addModal"),
+      libraryModal: document.getElementById("libraryModal"),
+      confirmModal: document.getElementById("confirmModal"),
+      bingoModal: document.getElementById("bingoModal"),
+      searchInput: document.getElementById("searchInput"),
+      authorInput: document.getElementById("authorInput"),
+      searchMessage: document.getElementById("searchMessage"),
+      searchResults: document.getElementById("searchResults"),
+      manualTitle: document.getElementById("manualTitle"),
+      manualAuthor: document.getElementById("manualAuthor"),
+      manualCover: document.getElementById("manualCover"),
+      confirmBook: document.getElementById("confirmBook"),
+      bingoMessage: document.getElementById("bingoMessage"),
+      toast: document.getElementById("toast")
+    };
+
+    let books = loadBooks();
+    let state = loadState();
+    let selectedCell = null;
+    let toastTimer = null;
+
+    document.getElementById("openAdd").addEventListener("click", () => openModal("addModal"));
+    document.getElementById("openLibrary").addEventListener("click", () => {
+      renderLibrary();
+      openModal("libraryModal");
+    });
+    document.getElementById("createBingo").addEventListener("click", createBingo);
+    document.getElementById("resetBingo").addEventListener("click", resetBingo);
+    document.getElementById("searchBooks").addEventListener("click", searchBooks);
+    document.getElementById("addManual").addEventListener("click", addManualBook);
+    document.getElementById("markRead").addEventListener("click", markSelectedRead);
+    els.searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") searchBooks();
+    });
+    els.authorInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") searchBooks();
+    });
+
+    document.querySelectorAll("[data-close]").forEach((button) => {
+      button.addEventListener("click", () => closeModal(button.dataset.close));
+    });
+
+    document.querySelectorAll(".modal").forEach((modal) => {
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal(modal.id);
+      });
+    });
+
+    render();
+
+    function loadBooks() {
+      try {
+        return JSON.parse(localStorage.getItem(BOOKS_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function loadState() {
+      const fallback = { currentBingo: [], openedCells: [], completedLines: [], createdAt: null };
+      try {
+        return { ...fallback, ...JSON.parse(localStorage.getItem(STATE_KEY) || "{}") };
+      } catch {
+        return fallback;
+      }
+    }
+
+    function saveBooks() {
+      try {
+        localStorage.setItem(BOOKS_KEY, JSON.stringify(books));
+        return true;
+      } catch {
+        showToast("保存容量がいっぱいです。不要な本を削除してから、もう一度試してください。");
+        return false;
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        return true;
+      } catch {
+        showToast("保存容量がいっぱいです。不要な本を削除してから、もう一度試してください。");
+        return false;
+      }
+    }
+
+    function render() {
+      syncCompletedLines();
+      els.bookCount.textContent = books.length;
+      els.openedCount.textContent = state.openedCells.length;
+      els.lineCount.textContent = state.completedLines.length;
+      renderStatus();
+      renderBingo();
+      renderMiniList();
+      renderLibrary();
+    }
+
+    function renderStatus() {
+      if (!state.currentBingo.length) {
+        els.statusText.textContent = books.length >= 9
+          ? "9冊以上そろっています。ビンゴを作って、今日の読むきっかけを並べましょう。"
+          : "ビンゴを作るには、9冊以上の本を登録してください。";
+        return;
+      }
+      if (state.completedLines.length) {
+        els.statusText.textContent = `ビンゴ達成中です。${state.completedLines.length}ラインそろっています。`;
+        return;
+      }
+      const left = 3 - bestLineProgress();
+      els.statusText.textContent = left <= 0
+        ? "ビンゴ達成です。"
+        : `あと${left}マスで、どこかのラインがそろいます。`;
+    }
+
+    function renderBingo() {
+      els.bingoGrid.innerHTML = "";
+      if (!state.currentBingo.length) {
+        for (let i = 0; i < 9; i++) {
+          const cell = document.createElement("div");
+          cell.className = "cell empty";
+          cell.textContent = i === 4 ? "本を9冊登録してビンゴを作る" : "空きマス";
+          els.bingoGrid.appendChild(cell);
+        }
+        return;
+      }
+
+      const winningCells = new Set(state.completedLines.flat());
+      state.currentBingo.forEach((bookId, index) => {
+        const book = books.find((item) => item.id === bookId);
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = [
+          "cell",
+          state.openedCells.includes(index) ? "opened" : "",
+          winningCells.has(index) ? "line-hit" : ""
+        ].join(" ");
+        if (!book) {
+          cell.classList.add("empty");
+          cell.textContent = "削除済みです。ビンゴを作り直してください。";
+          cell.disabled = true;
+        } else {
+          cell.appendChild(createBookView(book));
+          cell.addEventListener("click", () => openReadConfirm(index));
+        }
+        els.bingoGrid.appendChild(cell);
+      });
+    }
+
+    function renderMiniList() {
+      els.miniList.innerHTML = "";
+      if (!books.length) {
+        els.miniList.innerHTML = '<div class="empty-message">まだ本がありません。</div>';
+        return;
+      }
+      books.slice(0, 16).forEach((book) => {
+        const row = document.createElement("div");
+        row.className = "mini-book";
+        row.appendChild(createThumb(book));
+        row.appendChild(createMiniMeta(book));
+        els.miniList.appendChild(row);
+      });
+    }
+
+    function renderLibrary() {
+      els.libraryList.innerHTML = "";
+      if (!books.length) {
+        els.libraryList.innerHTML = '<div class="empty-message">本を追加すると、ここで削除できます。</div>';
+        return;
+      }
+      books.forEach((book) => {
+        const row = document.createElement("div");
+        row.className = "library-card";
+        row.appendChild(createThumb(book));
+
+        const meta = document.createElement("div");
+        meta.innerHTML = `<p class="card-title"></p><p class="card-sub"></p>`;
+        meta.querySelector(".card-title").textContent = book.title;
+        meta.querySelector(".card-sub").textContent = `${book.author || "著者不明"} / ${book.status === "read" ? "読了" : "未読"}`;
+        row.appendChild(meta);
+
+        const remove = document.createElement("button");
+        remove.className = "btn danger";
+        remove.textContent = "削除";
+        remove.addEventListener("click", () => deleteBook(book.id));
+        row.appendChild(remove);
+        els.libraryList.appendChild(row);
+      });
+    }
+
+    function createBookView(book) {
+      const wrap = document.createElement("div");
+      wrap.appendChild(createCover(book));
+      const meta = document.createElement("div");
+      meta.className = "book-meta";
+      const title = document.createElement("p");
+      title.className = "book-title";
+      title.textContent = book.title;
+      const author = document.createElement("p");
+      author.className = "book-author";
+      author.textContent = book.author || "著者不明";
+      meta.append(title, author);
+      wrap.appendChild(meta);
+      return wrap;
+    }
+
+    function createCover(book) {
+      const cover = document.createElement("div");
+      cover.className = "book-cover";
+      if (book.coverUrl) {
+        const img = document.createElement("img");
+        img.src = book.coverUrl;
+        img.alt = `${book.title}の表紙`;
+        img.loading = "lazy";
+        img.onerror = () => {
+          cover.innerHTML = "";
+          cover.appendChild(createFakeCover(book));
+        };
+        cover.appendChild(img);
+      } else {
+        cover.appendChild(createFakeCover(book));
+      }
+      return cover;
+    }
+
+    function createFakeCover(book) {
+      const fake = document.createElement("div");
+      fake.className = "fake-cover";
+      const title = document.createElement("div");
+      title.className = "fake-title";
+      title.textContent = book.title || "タイトルなし";
+      const author = document.createElement("div");
+      author.className = "fake-author";
+      author.textContent = book.author || "著者不明";
+      fake.append(title, author);
+      return fake;
+    }
+
+    function createThumb(book) {
+      const thumb = document.createElement("div");
+      thumb.className = "mini-thumb";
+      if (book.coverUrl) {
+        const img = document.createElement("img");
+        img.src = book.coverUrl;
+        img.alt = "";
+        img.loading = "lazy";
+        img.onerror = () => {
+          thumb.innerHTML = "";
+          thumb.appendChild(createFakeCover(book));
+        };
+        thumb.appendChild(img);
+      } else {
+        thumb.appendChild(createFakeCover(book));
+      }
+      return thumb;
+    }
+
+    function createMiniMeta(book) {
+      const meta = document.createElement("div");
+      const title = document.createElement("p");
+      title.className = "mini-title";
+      title.textContent = book.title;
+      const author = document.createElement("p");
+      author.className = "mini-author";
+      author.textContent = book.author || "著者不明";
+      meta.append(title, author);
+      return meta;
+    }
+
+    async function searchBooks() {
+      const titleQuery = els.searchInput.value.trim();
+      const authorQuery = els.authorInput.value.trim();
+      els.searchResults.innerHTML = "";
+      setSearchMessage("");
+      if (!titleQuery && !authorQuery) {
+        setSearchMessage("本のタイトルか作者名を入力してください。");
+        return;
+      }
+
+      document.getElementById("searchBooks").disabled = true;
+      setSearchMessage("NDLサーチでISBNを探し、openBDで書誌と書影を取得しています。");
+      try {
+        const isbnCandidates = await searchNdlsForIsbns(titleQuery, authorQuery);
+        if (!isbnCandidates.length) {
+          setSearchMessage("ISBNを見つけられませんでした。タイトルや作者名を短くするか、手入力で追加してください。");
+          return;
+        }
+
+        const openBdBooks = await fetchOpenBdBooks(isbnCandidates);
+        if (!openBdBooks.length) {
+          setSearchMessage("ISBN候補は見つかりましたが、openBDで書誌を取得できませんでした。手入力で追加してください。");
+          return;
+        }
+
+        setSearchMessage("");
+        openBdBooks.forEach((book) => renderSearchResult(book));
+      } catch {
+        setSearchMessage("本を検索できませんでした。通信環境を確認するか、手入力で追加してください。");
+      } finally {
+        document.getElementById("searchBooks").disabled = false;
+      }
+    }
+
+    async function searchNdlsForIsbns(title, author) {
+      const params = new URLSearchParams({
+        cnt: "100",
+        dpid: "iss-ndl-opac"
+      });
+      if (title) params.set("title", title);
+      if (author) params.set("creator", author);
+      const url = `https://ndlsearch.ndl.go.jp/api/opensearch?${params.toString()}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("NDL search failed");
+      const xmlText = await response.text();
+      const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+      const items = Array.from(doc.querySelectorAll("item"));
+      const candidates = [];
+
+      items.forEach((item) => {
+        const itemTitle = getXmlText(item, "dc:title") || getXmlText(item, "title");
+        const itemText = item.textContent || "";
+        const creators = Array.from(item.getElementsByTagName("dc:creator"))
+          .map((creator) => creator.textContent || "")
+          .join(" ");
+        const identifiers = Array.from(item.getElementsByTagName("dc:identifier"));
+        identifiers.forEach((identifier) => {
+          const type = identifier.getAttribute("xsi:type") || "";
+          if (!type.includes("ISBN")) return;
+          const isbn = normalizeIsbn(identifier.textContent || "");
+          if (isbn && !candidates.some((candidate) => candidate.isbn === isbn)) {
+            candidates.push({
+              isbn,
+              score: scoreSearchMatch({
+                title: itemTitle,
+                text: itemText,
+                creators,
+                titleQuery: title,
+                authorQuery: author
+              })
+            });
+          }
+        });
+      });
+
+      return candidates
+        .sort((a, b) => b.score - a.score)
+        .map((candidate) => candidate.isbn)
+        .slice(0, 20);
+    }
+
+    function getXmlText(parent, tagName) {
+      const node = parent.getElementsByTagName(tagName)[0];
+      return node ? node.textContent.trim() : "";
+    }
+
+    function scoreSearchMatch({ title, text, creators, titleQuery, authorQuery }) {
+      const titleScore = titleQuery ? scoreTitleMatch(title, text, titleQuery) : 20;
+      const authorScore = authorQuery ? scoreAuthorMatch(creators || text, authorQuery) : 0;
+      return titleScore + authorScore;
+    }
+
+    function scoreAuthorMatch(candidateText, query) {
+      const normalizedText = normalizeSearchText(candidateText);
+      const normalizedQuery = normalizeSearchText(query);
+      if (!normalizedText || !normalizedQuery) return 0;
+      if (normalizedText.includes(normalizedQuery)) return 40;
+      return 0;
+    }
+
+    function scoreTitleMatch(candidateTitle, candidateText, query) {
+      const normalizedTitle = normalizeSearchText(candidateTitle);
+      const normalizedText = normalizeSearchText(candidateText);
+      const normalizedQuery = normalizeSearchText(query);
+      if (!normalizedQuery) return 0;
+      if (normalizedTitle === normalizedQuery) return 100;
+      if (normalizedTitle.startsWith(normalizedQuery)) return 80;
+      if (normalizedTitle.includes(normalizedQuery)) return 60;
+      if (normalizedText.includes(normalizedQuery)) return 35;
+      return 10;
+    }
+
+    function normalizeSearchText(value) {
+      return String(value)
+        .normalize("NFKC")
+        .replace(/\s+/g, "")
+        .replace(/[『』「」【】（）()［］\[\]・:：,，.．]/g, "")
+        .toLowerCase();
+    }
+
+    async function fetchOpenBdBooks(isbns) {
+      const booksByIsbn = new Map();
+      for (let i = 0; i < isbns.length; i += 10) {
+        const chunk = isbns.slice(i, i + 10);
+        const url = `https://api.openbd.jp/v1/get?isbn=${encodeURIComponent(chunk.join(","))}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("openBD failed");
+        const data = await response.json();
+        data.filter(Boolean).forEach((item) => {
+          const book = normalizeOpenBdBook(item);
+          if (book && !booksByIsbn.has(book.isbn)) booksByIsbn.set(book.isbn, book);
+        });
+      }
+      return Array.from(booksByIsbn.values()).slice(0, 10);
+    }
+
+    function normalizeIsbn(value) {
+      const isbn = String(value).replace(/[^0-9Xx]/g, "").toUpperCase();
+      if (isbn.length === 10 || isbn.length === 13) return isbn;
+      return "";
+    }
+
+    function normalizeOpenBdBook(item) {
+      const summary = item.summary || {};
+      const onix = item.onix || {};
+      const descriptive = onix.DescriptiveDetail || {};
+      const contributors = descriptive.Contributor || [];
+      const authors = contributors
+        .map((person) => person.PersonName?.content || person.PersonName || "")
+        .filter(Boolean);
+      const title = summary.title || descriptive.TitleDetail?.TitleElement?.TitleText?.content || "";
+      const isbn = normalizeIsbn(summary.isbn || "");
+      if (!title || !isbn) return null;
+
+      return {
+        id: createId(),
+        title,
+        author: summary.author || authors.join(", ") || "",
+        coverId: null,
+        coverUrl: summary.cover || null,
+        isbn,
+        publisher: summary.publisher || "",
+        status: "unread",
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    function renderSearchResult(book) {
+      const row = document.createElement("div");
+      row.className = "result-card";
+      row.appendChild(createThumb(book));
+
+      const meta = document.createElement("div");
+      const title = document.createElement("p");
+      title.className = "card-title";
+      title.textContent = book.title;
+      const sub = document.createElement("p");
+      sub.className = "card-sub";
+      sub.textContent = `${book.author || "著者不明"}${book.publisher ? ` / ${book.publisher}` : ""}${book.isbn ? ` / ISBN ${book.isbn}` : ""}`;
+      meta.append(title, sub);
+      row.appendChild(meta);
+
+      const add = document.createElement("button");
+      add.className = "btn leaf";
+      add.textContent = "追加";
+      add.addEventListener("click", () => addBook(book));
+      row.appendChild(add);
+      els.searchResults.appendChild(row);
+    }
+
+    function addManualBook() {
+      const title = els.manualTitle.value.trim();
+      const author = els.manualAuthor.value.trim();
+      const coverUrl = els.manualCover.value.trim();
+      if (!title) {
+        showToast("手入力タイトルを入力してください。");
+        return;
+      }
+      addBook({
+        id: createId(),
+        title,
+        author,
+        coverId: null,
+        coverUrl: coverUrl || null,
+        status: "unread",
+        createdAt: new Date().toISOString()
+      });
+      els.manualTitle.value = "";
+      els.manualAuthor.value = "";
+      els.manualCover.value = "";
+    }
+
+    function addBook(book) {
+      if (books.some((item) => item.title === book.title && item.author === book.author)) {
+        showToast("同じタイトルと著者の本がすでにあります。");
+        return;
+      }
+      books = [book, ...books];
+      if (saveBooks()) {
+        render();
+        showToast("本を追加しました。");
+      }
+    }
+
+    function deleteBook(bookId) {
+      const inCurrentBingo = state.currentBingo.includes(bookId);
+      const message = inCurrentBingo
+        ? "この本は現在のビンゴに含まれています。削除後はビンゴを作り直してください。削除しますか？"
+        : "この本を本棚から削除しますか？";
+      if (!confirm(message)) return;
+      books = books.filter((book) => book.id !== bookId);
+      if (saveBooks()) {
+        render();
+        showToast(inCurrentBingo ? "削除しました。必要ならビンゴを作り直してください。" : "削除しました。");
+      }
+    }
+
+    function createBingo() {
+      if (books.length < 9) {
+        showToast("ビンゴを作るには、9冊以上の本を登録してください。");
+        return;
+      }
+      if (state.currentBingo.length && !confirm("現在のビンゴを作り直しますか？途中経過はリセットされます。")) {
+        return;
+      }
+      const shuffled = [...books].sort(() => Math.random() - 0.5);
+      state = {
+        currentBingo: shuffled.slice(0, 9).map((book) => book.id),
+        openedCells: [],
+        completedLines: [],
+        createdAt: new Date().toISOString()
+      };
+      if (saveState()) {
+        render();
+        showToast("新しいビンゴを作りました。");
+      }
+    }
+
+    function resetBingo() {
+      if (!state.currentBingo.length) {
+        showToast("リセットするビンゴがありません。");
+        return;
+      }
+      if (!confirm("現在のビンゴをリセットしますか？登録した本は消えません。")) return;
+      state = { currentBingo: [], openedCells: [], completedLines: [], createdAt: null };
+      if (saveState()) {
+        render();
+        showToast("ビンゴをリセットしました。");
+      }
+    }
+
+    function openReadConfirm(index) {
+      if (state.openedCells.includes(index)) {
+        showToast("このマスは読了済みです。");
+        return;
+      }
+      selectedCell = index;
+      const book = books.find((item) => item.id === state.currentBingo[index]);
+      if (!book) return;
+      els.confirmBook.innerHTML = "";
+      els.confirmBook.appendChild(createCover(book));
+      const text = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = book.title;
+      const author = document.createElement("p");
+      author.className = "card-sub";
+      author.textContent = book.author || "著者不明";
+      const question = document.createElement("p");
+      question.textContent = "この本を読みましたか？";
+      text.append(title, author, question);
+      els.confirmBook.appendChild(text);
+      openModal("confirmModal");
+    }
+
+    function markSelectedRead() {
+      if (selectedCell === null) return;
+      if (!state.openedCells.includes(selectedCell)) {
+        state.openedCells.push(selectedCell);
+      }
+      const before = state.completedLines.length;
+      syncCompletedLines();
+      if (saveState()) {
+        closeModal("confirmModal");
+        render();
+        if (state.completedLines.length > before) {
+          showBingoMessage();
+        } else {
+          showToast("読了しました。");
+        }
+      }
+      selectedCell = null;
+    }
+
+    function syncCompletedLines() {
+      state.completedLines = BINGO_LINES.filter((line) =>
+        line.every((index) => state.openedCells.includes(index))
+      );
+    }
+
+    function bestLineProgress() {
+      if (!state.currentBingo.length) return 0;
+      return Math.max(...BINGO_LINES.map((line) =>
+        line.filter((index) => state.openedCells.includes(index)).length
+      ));
+    }
+
+    function showBingoMessage() {
+      const latestLine = state.completedLines[state.completedLines.length - 1];
+      const lineBooks = latestLine
+        .map((index) => books.find((book) => book.id === state.currentBingo[index]))
+        .filter(Boolean);
+      els.bingoMessage.innerHTML = "";
+      const title = document.createElement("p");
+      title.className = "celebrate-title";
+      title.textContent = "おめでとう〜！！！";
+      const lead = document.createElement("p");
+      lead.textContent = "積読の山に、ちゃんと道ができました。3冊読了達成です！";
+      const list = document.createElement("div");
+      list.className = "line-books";
+      lineBooks.forEach((book) => {
+        const row = document.createElement("div");
+        row.className = "mini-book";
+        row.appendChild(createThumb(book));
+        row.appendChild(createMiniMeta(book));
+        list.appendChild(row);
+      });
+      els.bingoMessage.append(title, lead, list);
+      openModal("bingoModal");
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.add("show");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("show");
+    }
+
+    function setSearchMessage(message) {
+      els.searchMessage.style.display = message ? "block" : "none";
+      els.searchMessage.textContent = message;
+    }
+
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      toastTimer = setTimeout(() => els.toast.classList.remove("show"), 3200);
+    }
+
+    function createId() {
+      return `book_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }
+  </script>
+</body>
+</html>
