@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>積読ビンゴ</title>
+  <title>積読本棚</title>
   <style>
     :root {
       --paper: #fbfbf6;
@@ -235,11 +235,11 @@
       box-shadow: none;
     }
 
-    .bingo-grid {
+    .bingo-grid,
+    .library-shelf {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
-      min-height: 660px;
       padding: 18px;
       border-radius: 20px;
       background:
@@ -250,6 +250,71 @@
         inset 0 0 0 8px rgba(79, 47, 27, 0.32),
         inset 0 0 0 14px rgba(255, 255, 255, 0.12),
         0 18px 44px rgba(79, 47, 27, 0.24);
+    }
+
+    .bingo-grid {
+      min-height: 660px;
+    }
+
+    .library-shelf {
+      min-height: 0;
+      margin-top: 12px;
+    }
+
+    .today-pick {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+      min-height: 250px;
+      padding: 18px;
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(48, 29, 16, 0.18), transparent 28%, rgba(255, 255, 255, 0.12)),
+        linear-gradient(180deg, #e2cfb2, #c9aa7e);
+      box-shadow:
+        inset 0 -18px 0 rgba(79, 47, 27, 0.3),
+        inset 8px 0 14px rgba(48, 29, 16, 0.14);
+    }
+
+    .today-pick .book-cover {
+      width: min(88%, 180px);
+    }
+
+    .today-pick .actions {
+      margin: 16px 0 0;
+    }
+
+    .pick-label {
+      margin: 0 0 8px;
+      color: var(--leaf-dark);
+      font-size: 0.86rem;
+      font-weight: 900;
+    }
+
+    .pick-title {
+      margin: 0;
+      font-size: clamp(1.6rem, 4vw, 3rem);
+      line-height: 1.15;
+      font-weight: 900;
+    }
+
+    .pick-author {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .shelf-heading {
+      grid-column: 1 / -1;
+      margin: 2px 0 -2px;
+      padding: 8px 10px;
+      color: var(--cream);
+      background: rgba(79, 47, 27, 0.72);
+      border-radius: 6px;
+      font-weight: 900;
     }
 
     .cell {
@@ -409,6 +474,24 @@
         inset -8px 0 12px rgba(255, 255, 255, 0.13),
         inset 0 -14px 0 rgba(79, 47, 27, 0.32),
         inset 0 -18px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .cell.read-book {
+      filter: saturate(0.82);
+    }
+
+    .cell.read-book::after {
+      content: "読了";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: var(--cream);
+      background: var(--leaf);
+      font-size: 0.78rem;
+      font-weight: 900;
     }
 
     .side-panel {
@@ -660,6 +743,11 @@
       gap: 8px;
     }
 
+    .library-section {
+      display: grid;
+      gap: 10px;
+    }
+
     .toast {
       position: fixed;
       right: 16px;
@@ -714,6 +802,15 @@
         gap: 6px;
       }
 
+      .library-shelf {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .today-pick {
+        grid-template-columns: 1fr;
+      }
+
       .board-panel {
         padding: 10px;
       }
@@ -750,21 +847,21 @@
   <main class="app">
     <section class="hero" aria-labelledby="appTitle">
       <div class="title-wrap">
-        <p class="eyebrow">罪悪感じゃなくて、ビンゴにしよう。</p>
-        <h1 id="appTitle">積読<br>ビンゴ</h1>
-        <p class="subtitle">読めない本棚を、遊べる本棚に。登録した積読から9冊をランダムに並べて、読めた本を開いていきます。</p>
+        <p class="eyebrow">今日、開いてみる1冊を選ぼう。</p>
+        <h1 id="appTitle">積読<br>本棚</h1>
+        <p class="subtitle">読めない本棚を、選べる本棚に。登録した積読からランダムに1冊を出して、読了した本は読了棚へ移します。</p>
       </div>
-      <div class="shelf-meter" aria-label="本棚とビンゴの状態">
+      <div class="shelf-meter" aria-label="本棚の状態">
         <div class="meter-item">
-          <span class="meter-label">登録した本</span>
+          <span class="meter-label">未読の本</span>
           <strong class="meter-value" id="bookCount">0</strong>
         </div>
         <div class="meter-item">
-          <span class="meter-label">開いたマス</span>
+          <span class="meter-label">読了した本</span>
           <strong class="meter-value" id="openedCount">0</strong>
         </div>
         <div class="meter-item">
-          <span class="meter-label">達成ライン</span>
+          <span class="meter-label">登録した本</span>
           <strong class="meter-value" id="lineCount">0</strong>
         </div>
       </div>
@@ -773,21 +870,21 @@
     <section class="layout">
       <div class="board-panel">
         <div class="panel-head">
-          <h2 class="panel-title">現在のビンゴカード</h2>
+          <h2 class="panel-title">今日開いてみる本</h2>
         </div>
-        <div class="status" id="statusText">ビンゴを作るには、9冊以上の本を登録してください。</div>
+        <div class="status" id="statusText">本を登録すると、今日開いてみる1冊を選べます。</div>
         <div class="actions">
           <button class="btn leaf" id="openAdd">本を追加</button>
           <button class="btn" id="openLibrary">本棚を編集</button>
-          <button class="btn secondary" id="createBingo">ビンゴを作る</button>
-          <button class="btn ghost" id="resetBingo">リセット</button>
+          <button class="btn secondary" id="createBingo">今日の1冊を選ぶ</button>
+          <button class="btn ghost" id="resetBingo">選び直す</button>
         </div>
         <div class="bingo-grid" id="bingoGrid" aria-live="polite"></div>
       </div>
 
       <aside class="side-panel">
         <p class="notice">タイトル・作者検索にはNDLサーチAPI、書誌と書影の補完にはopenBDを利用します。本棚と読了状態はこのブラウザ内だけに保存されます。</p>
-        <h2 class="panel-title">本棚</h2>
+        <h2 class="panel-title">読了棚</h2>
         <div class="mini-list" id="miniList"></div>
       </aside>
     </section>
@@ -843,26 +940,16 @@
   <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="dialog small">
       <div class="dialog-head">
-        <h2 id="confirmTitle">読了確認</h2>
+        <h2 id="confirmTitle">本の状態</h2>
         <button class="icon-btn" data-close="confirmModal" aria-label="閉じる">×</button>
       </div>
       <div class="dialog-body">
         <div class="confirm-book" id="confirmBook"></div>
         <div class="actions" style="grid-template-columns: 1fr 1fr;">
-          <button class="btn leaf" id="markRead">読了する</button>
-          <button class="btn ghost" data-close="confirmModal">まだ読んでいない</button>
+          <button class="btn leaf" id="markRead">読了にする</button>
+          <button class="btn ghost" id="markUnread">まだ読んでない</button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="modal" id="bingoModal" role="dialog" aria-modal="true" aria-labelledby="bingoTitle">
-    <div class="dialog small">
-      <div class="dialog-head">
-        <h2 id="bingoTitle">ビンゴ達成</h2>
-        <button class="icon-btn" data-close="bingoModal" aria-label="閉じる">×</button>
-      </div>
-      <div class="dialog-body celebrate" id="bingoMessage"></div>
     </div>
   </div>
 
@@ -871,16 +958,6 @@
   <script>
     const BOOKS_KEY = "tsundoku_books";
     const STATE_KEY = "tsundoku_bingo_state";
-    const BINGO_LINES = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6]
-    ];
 
     const els = {
       bookCount: document.getElementById("bookCount"),
@@ -893,7 +970,6 @@
       addModal: document.getElementById("addModal"),
       libraryModal: document.getElementById("libraryModal"),
       confirmModal: document.getElementById("confirmModal"),
-      bingoModal: document.getElementById("bingoModal"),
       searchInput: document.getElementById("searchInput"),
       authorInput: document.getElementById("authorInput"),
       searchMessage: document.getElementById("searchMessage"),
@@ -902,8 +978,9 @@
       manualAuthor: document.getElementById("manualAuthor"),
       manualCover: document.getElementById("manualCover"),
       confirmBook: document.getElementById("confirmBook"),
-      bingoMessage: document.getElementById("bingoMessage"),
-      toast: document.getElementById("toast")
+      toast: document.getElementById("toast"),
+      markRead: document.getElementById("markRead"),
+      markUnread: document.getElementById("markUnread")
     };
 
     let books = loadBooks();
@@ -923,6 +1000,7 @@
     document.getElementById("searchBooks").addEventListener("click", searchBooks);
     document.getElementById("addManual").addEventListener("click", addManualBook);
     document.getElementById("markRead").addEventListener("click", markSelectedRead);
+    document.getElementById("markUnread").addEventListener("click", markSelectedUnread);
     els.searchInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") searchBooks();
     });
@@ -944,16 +1022,24 @@
 
     function loadBooks() {
       try {
-        return JSON.parse(localStorage.getItem(BOOKS_KEY) || "[]");
+        return JSON.parse(localStorage.getItem(BOOKS_KEY) || "[]").map((book) => ({
+          ...book,
+          status: book.status === "read" ? "read" : "unread"
+        }));
       } catch {
         return [];
       }
     }
 
     function loadState() {
-      const fallback = { currentBingo: [], openedCells: [], completedLines: [], createdAt: null };
+      const fallback = { featuredBookId: null, pickedAt: null };
       try {
-        return { ...fallback, ...JSON.parse(localStorage.getItem(STATE_KEY) || "{}") };
+        const saved = JSON.parse(localStorage.getItem(STATE_KEY) || "{}");
+        return {
+          ...fallback,
+          featuredBookId: saved.featuredBookId || null,
+          pickedAt: saved.pickedAt || saved.createdAt || null
+        };
       } catch {
         return fallback;
       }
@@ -980,10 +1066,11 @@
     }
 
     function render() {
-      syncCompletedLines();
-      els.bookCount.textContent = books.length;
-      els.openedCount.textContent = state.openedCells.length;
-      els.lineCount.textContent = state.completedLines.length;
+      const unreadBooks = getUnreadBooks();
+      const readBooks = getReadBooks();
+      els.bookCount.textContent = unreadBooks.length;
+      els.openedCount.textContent = readBooks.length;
+      els.lineCount.textContent = books.length;
       renderStatus();
       renderBingo();
       renderMiniList();
@@ -991,63 +1078,53 @@
     }
 
     function renderStatus() {
-      if (!state.currentBingo.length) {
-        els.statusText.textContent = books.length >= 9
-          ? "9冊以上そろっています。ビンゴを作って、今日の読むきっかけを並べましょう。"
-          : "ビンゴを作るには、9冊以上の本を登録してください。";
+      const unreadBooks = getUnreadBooks();
+      const featuredBook = getFeaturedBook();
+      if (!unreadBooks.length) {
+        els.statusText.textContent = books.length
+          ? "未読の本がありません。読了棚から未読に戻すか、本を追加してください。"
+          : "本を登録すると、今日開いてみる1冊を選べます。";
         return;
       }
-      if (state.completedLines.length) {
-        els.statusText.textContent = `ビンゴ達成中です。${state.completedLines.length}ラインそろっています。`;
+      if (featuredBook) {
+        els.statusText.textContent = `今日は「${featuredBook.title}」を開いてみませんか。`;
         return;
       }
-      const left = 3 - bestLineProgress();
-      els.statusText.textContent = left <= 0
-        ? "ビンゴ達成です。"
-        : `あと${left}マスで、どこかのラインがそろいます。`;
+      els.statusText.textContent = "未読棚から、今日開いてみる1冊をランダムに選べます。";
     }
 
     function renderBingo() {
       els.bingoGrid.innerHTML = "";
-      if (!state.currentBingo.length) {
-        for (let i = 0; i < 9; i++) {
-          const cell = document.createElement("div");
-          cell.className = "cell empty";
-          cell.textContent = i === 4 ? "本を9冊登録してビンゴを作る" : "空きマス";
-          els.bingoGrid.appendChild(cell);
-        }
+      const unreadBooks = getUnreadBooks();
+      const featuredBook = getFeaturedBook();
+
+      els.bingoGrid.appendChild(createTodayPick(featuredBook));
+      const heading = document.createElement("div");
+      heading.className = "shelf-heading";
+      heading.textContent = `未読棚 ${unreadBooks.length}冊`;
+      els.bingoGrid.appendChild(heading);
+
+      if (!unreadBooks.length) {
+        const cell = document.createElement("div");
+        cell.className = "cell empty";
+        cell.textContent = books.length ? "未読の本はありません。" : "本を追加すると、ここに未読棚ができます。";
+        els.bingoGrid.appendChild(cell);
         return;
       }
 
-      const winningCells = new Set(state.completedLines.flat());
-      state.currentBingo.forEach((bookId, index) => {
-        const book = books.find((item) => item.id === bookId);
-        const cell = document.createElement("button");
-        cell.type = "button";
-        cell.className = [
-          "cell",
-          state.openedCells.includes(index) ? "opened" : "",
-          winningCells.has(index) ? "line-hit" : ""
-        ].join(" ");
-        if (!book) {
-          cell.classList.add("empty");
-          cell.textContent = "削除済みです。ビンゴを作り直してください。";
-          cell.disabled = true;
-        } else {
-          cell.appendChild(createBookView(book));
-          cell.addEventListener("click", () => openReadConfirm(index));
-        }
-        els.bingoGrid.appendChild(cell);
+      unreadBooks.forEach((book) => {
+        els.bingoGrid.appendChild(createShelfCell(book));
       });
     }
 
     function renderMiniList() {
       els.miniList.innerHTML = "";
-      if (!books.length) {
-        els.miniList.innerHTML = '<div class="empty-message">まだ本がありません。</div>';
+      const readBooks = getReadBooks();
+      if (!readBooks.length) {
+        els.miniList.innerHTML = '<div class="empty-message">読了した本はまだありません。</div>';
         return;
       }
-      books.slice(0, 16).forEach((book) => {
+      readBooks.slice(0, 16).forEach((book) => {
         const row = document.createElement("div");
         row.className = "mini-book";
         row.appendChild(createThumb(book));
@@ -1062,24 +1139,109 @@
         els.libraryList.innerHTML = '<div class="empty-message">本を追加すると、ここで削除できます。</div>';
         return;
       }
-      books.forEach((book) => {
-        const row = document.createElement("div");
-        row.className = "library-card";
-        row.appendChild(createThumb(book));
+      [
+        { title: `未読 ${getUnreadBooks().length}冊`, books: getUnreadBooks() },
+        { title: `読了 ${getReadBooks().length}冊`, books: getReadBooks() }
+      ].forEach((section) => {
+        const wrap = document.createElement("section");
+        wrap.className = "library-section";
+        const title = document.createElement("h3");
+        title.className = "panel-title";
+        title.textContent = section.title;
+        const shelf = document.createElement("div");
+        shelf.className = "library-shelf";
+        if (!section.books.length) {
+          const empty = document.createElement("div");
+          empty.className = "cell empty";
+          empty.textContent = "ここにはまだ本がありません。";
+          shelf.appendChild(empty);
+        } else {
+          section.books.forEach((book) => shelf.appendChild(createShelfCell(book, true)));
+        }
+        wrap.append(title, shelf);
+        els.libraryList.appendChild(wrap);
+      });
+    }
 
-        const meta = document.createElement("div");
-        meta.innerHTML = `<p class="card-title"></p><p class="card-sub"></p>`;
-        meta.querySelector(".card-title").textContent = book.title;
-        meta.querySelector(".card-sub").textContent = `${book.author || "著者不明"} / ${book.status === "read" ? "読了" : "未読"}`;
-        row.appendChild(meta);
+    function createTodayPick(book) {
+      const wrap = document.createElement("div");
+      wrap.className = "today-pick";
+      if (!book) {
+        const cover = document.createElement("div");
+        cover.className = "book-cover";
+        cover.appendChild(createFakeCover({ title: "今日の1冊", author: "未選択" }));
+        const text = document.createElement("div");
+        const label = document.createElement("p");
+        label.className = "pick-label";
+        label.textContent = "今日の候補";
+        const title = document.createElement("h3");
+        title.className = "pick-title";
+        title.textContent = "まだ選ばれていません";
+        const lead = document.createElement("p");
+        lead.className = "pick-author";
+        lead.textContent = getUnreadBooks().length ? "「今日の1冊を選ぶ」を押すと、未読棚からランダムに選びます。" : "本を追加すると、ここに候補が出ます。";
+        text.append(label, title, lead);
+        wrap.append(cover, text);
+        return wrap;
+      }
 
+      wrap.appendChild(createCover(book));
+      const text = document.createElement("div");
+      const label = document.createElement("p");
+      label.className = "pick-label";
+      label.textContent = "今日開いてみる本";
+      const title = document.createElement("h3");
+      title.className = "pick-title";
+      title.textContent = book.title;
+      const author = document.createElement("p");
+      author.className = "pick-author";
+      author.textContent = book.author || "著者不明";
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      actions.style.gridTemplateColumns = "minmax(0, 1fr) minmax(0, 1fr)";
+      const read = document.createElement("button");
+      read.className = "btn leaf";
+      read.textContent = "読了にする";
+      read.addEventListener("click", () => openReadConfirm(book.id));
+      const again = document.createElement("button");
+      again.className = "btn ghost";
+      again.textContent = "もう一度選ぶ";
+      again.addEventListener("click", createBingo);
+      actions.append(read, again);
+      text.append(label, title, author, actions);
+      wrap.appendChild(text);
+      return wrap;
+    }
+
+    function createShelfCell(book, withDelete = false) {
+      const cell = document.createElement(withDelete ? "div" : "button");
+      if (!withDelete) cell.type = "button";
+      cell.className = `cell ${book.status === "read" ? "read-book" : ""}`;
+      cell.appendChild(createBookView(book));
+      cell.addEventListener("click", () => openReadConfirm(book.id));
+      if (withDelete) {
+        cell.setAttribute("role", "button");
+        cell.tabIndex = 0;
+        cell.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") openReadConfirm(book.id);
+        });
         const remove = document.createElement("button");
+        remove.type = "button";
         remove.className = "btn danger";
         remove.textContent = "削除";
-        remove.addEventListener("click", () => deleteBook(book.id));
-        row.appendChild(remove);
-        els.libraryList.appendChild(row);
-      });
+        remove.style.position = "absolute";
+        remove.style.left = "12px";
+        remove.style.top = "12px";
+        remove.style.zIndex = "3";
+        remove.style.minHeight = "34px";
+        remove.style.padding = "6px 10px";
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteBook(book.id);
+        });
+        cell.appendChild(remove);
+      }
+      return cell;
     }
 
     function createBookView(book) {
@@ -1655,7 +1817,7 @@
         showToast("同じタイトルと著者の本がすでにあります。");
         return;
       }
-      books = [book, ...books];
+      books = [{ ...book, status: "unread" }, ...books];
       if (saveBooks()) {
         render();
         showToast("本を追加しました。");
@@ -1663,59 +1825,48 @@
     }
 
     function deleteBook(bookId) {
-      const inCurrentBingo = state.currentBingo.includes(bookId);
-      const message = inCurrentBingo
-        ? "この本は現在のビンゴに含まれています。削除後はビンゴを作り直してください。削除しますか？"
-        : "この本を本棚から削除しますか？";
-      if (!confirm(message)) return;
+      if (!confirm("この本を本棚から削除しますか？")) return;
       books = books.filter((book) => book.id !== bookId);
+      if (state.featuredBookId === bookId) {
+        state = { featuredBookId: null, pickedAt: null };
+        saveState();
+      }
       if (saveBooks()) {
         render();
-        showToast(inCurrentBingo ? "削除しました。必要ならビンゴを作り直してください。" : "削除しました。");
+        showToast("削除しました。");
       }
     }
 
     function createBingo() {
-      if (books.length < 9) {
-        showToast("ビンゴを作るには、9冊以上の本を登録してください。");
+      const unreadBooks = getUnreadBooks();
+      if (!unreadBooks.length) {
+        showToast("未読の本がありません。本を追加するか、読了棚から未読に戻してください。");
         return;
       }
-      if (state.currentBingo.length && !confirm("現在のビンゴを作り直しますか？途中経過はリセットされます。")) {
-        return;
-      }
-      const shuffled = [...books].sort(() => Math.random() - 0.5);
+      const candidates = unreadBooks.filter((book) => book.id !== state.featuredBookId);
+      const pool = candidates.length ? candidates : unreadBooks;
+      const picked = pool[Math.floor(Math.random() * pool.length)];
       state = {
-        currentBingo: shuffled.slice(0, 9).map((book) => book.id),
-        openedCells: [],
-        completedLines: [],
-        createdAt: new Date().toISOString()
+        featuredBookId: picked.id,
+        pickedAt: new Date().toISOString()
       };
       if (saveState()) {
         render();
-        showToast("新しいビンゴを作りました。");
+        showToast("今日開いてみる本を選びました。");
       }
     }
 
     function resetBingo() {
-      if (!state.currentBingo.length) {
-        showToast("リセットするビンゴがありません。");
+      if (!state.featuredBookId) {
+        createBingo();
         return;
       }
-      if (!confirm("現在のビンゴをリセットしますか？登録した本は消えません。")) return;
-      state = { currentBingo: [], openedCells: [], completedLines: [], createdAt: null };
-      if (saveState()) {
-        render();
-        showToast("ビンゴをリセットしました。");
-      }
+      createBingo();
     }
 
-    function openReadConfirm(index) {
-      if (state.openedCells.includes(index)) {
-        showToast("このマスは読了済みです。");
-        return;
-      }
-      selectedCell = index;
-      const book = books.find((item) => item.id === state.currentBingo[index]);
+    function openReadConfirm(bookId) {
+      selectedCell = bookId;
+      const book = books.find((item) => item.id === bookId);
       if (!book) return;
       els.confirmBook.innerHTML = "";
       els.confirmBook.appendChild(createCover(book));
@@ -1726,66 +1877,64 @@
       author.className = "card-sub";
       author.textContent = book.author || "著者不明";
       const question = document.createElement("p");
-      question.textContent = "この本を読みましたか？";
+      question.textContent = book.status === "read"
+        ? "この本は読了棚にあります。未読棚に戻すこともできます。"
+        : "この本を読み終えましたか？";
       text.append(title, author, question);
       els.confirmBook.appendChild(text);
+      els.markRead.textContent = book.status === "read" ? "読了のまま" : "読了にする";
+      els.markUnread.textContent = book.status === "read" ? "未読に戻す" : "まだ読んでない";
       openModal("confirmModal");
     }
 
     function markSelectedRead() {
       if (selectedCell === null) return;
-      if (!state.openedCells.includes(selectedCell)) {
-        state.openedCells.push(selectedCell);
+      const book = books.find((item) => item.id === selectedCell);
+      if (!book) return;
+      book.status = "read";
+      if (state.featuredBookId === book.id) {
+        state = { featuredBookId: null, pickedAt: null };
+        saveState();
       }
-      const before = state.completedLines.length;
-      syncCompletedLines();
-      if (saveState()) {
+      if (saveBooks()) {
         closeModal("confirmModal");
         render();
-        if (state.completedLines.length > before) {
-          showBingoMessage();
-        } else {
-          showToast("読了しました。");
-        }
+        showToast("読了棚に移しました。");
       }
       selectedCell = null;
     }
 
-    function syncCompletedLines() {
-      state.completedLines = BINGO_LINES.filter((line) =>
-        line.every((index) => state.openedCells.includes(index))
-      );
+    function markSelectedUnread() {
+      if (selectedCell === null) {
+        closeModal("confirmModal");
+        return;
+      }
+      const book = books.find((item) => item.id === selectedCell);
+      if (!book) return;
+      if (book.status === "read") {
+        book.status = "unread";
+        if (saveBooks()) {
+          closeModal("confirmModal");
+          render();
+          showToast("未読棚に戻しました。");
+        }
+      } else {
+        closeModal("confirmModal");
+      }
+      selectedCell = null;
     }
 
-    function bestLineProgress() {
-      if (!state.currentBingo.length) return 0;
-      return Math.max(...BINGO_LINES.map((line) =>
-        line.filter((index) => state.openedCells.includes(index)).length
-      ));
+    function getUnreadBooks() {
+      return books.filter((book) => book.status !== "read");
     }
 
-    function showBingoMessage() {
-      const latestLine = state.completedLines[state.completedLines.length - 1];
-      const lineBooks = latestLine
-        .map((index) => books.find((book) => book.id === state.currentBingo[index]))
-        .filter(Boolean);
-      els.bingoMessage.innerHTML = "";
-      const title = document.createElement("p");
-      title.className = "celebrate-title";
-      title.textContent = "おめでとう〜！！！";
-      const lead = document.createElement("p");
-      lead.textContent = "積読の山に、ちゃんと道ができました。3冊読了達成です！";
-      const list = document.createElement("div");
-      list.className = "line-books";
-      lineBooks.forEach((book) => {
-        const row = document.createElement("div");
-        row.className = "mini-book";
-        row.appendChild(createThumb(book));
-        row.appendChild(createMiniMeta(book));
-        list.appendChild(row);
-      });
-      els.bingoMessage.append(title, lead, list);
-      openModal("bingoModal");
+    function getReadBooks() {
+      return books.filter((book) => book.status === "read");
+    }
+
+    function getFeaturedBook() {
+      const book = books.find((item) => item.id === state.featuredBookId);
+      return book && book.status !== "read" ? book : null;
     }
 
     function openModal(id) {
