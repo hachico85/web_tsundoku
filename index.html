@@ -786,7 +786,7 @@
       </div>
 
       <aside class="side-panel">
-        <p class="notice">タイトル検索にはNDLサーチAPI、書誌と書影の取得にはopenBDを利用します。本棚と読了状態はこのブラウザ内だけに保存されます。</p>
+        <p class="notice">タイトル・作者検索にはNDLサーチAPI、書誌と書影の補完にはopenBDを利用します。本棚と読了状態はこのブラウザ内だけに保存されます。</p>
         <h2 class="panel-title">本棚</h2>
         <div class="mini-list" id="miniList"></div>
       </aside>
@@ -910,6 +910,8 @@
     let state = loadState();
     let selectedCell = null;
     let toastTimer = null;
+    let activeSearchId = 0;
+    let activeSearchController = null;
 
     document.getElementById("openAdd").addEventListener("click", () => openModal("addModal"));
     document.getElementById("openLibrary").addEventListener("click", () => {
@@ -1162,6 +1164,11 @@
     async function searchBooks() {
       const titleQuery = els.searchInput.value.trim();
       const authorQuery = els.authorInput.value.trim();
+      const searchId = activeSearchId + 1;
+      activeSearchId = searchId;
+      if (activeSearchController) activeSearchController.abort();
+      activeSearchController = new AbortController();
+      const { signal } = activeSearchController;
       els.searchResults.innerHTML = "";
       setSearchMessage("");
       if (!titleQuery && !authorQuery) {
@@ -1169,39 +1176,43 @@
         return;
       }
 
-      document.getElementById("searchBooks").disabled = true;
-      setSearchMessage("NDLサーチでISBNを探し、openBDで書誌と書影を取得しています。");
+      document.getElementById("searchBooks").disabled = false;
+      setSearchMessage("NDLサーチで候補を探し、ISBNがある本はopenBDで書誌と書影を補完しています。");
       try {
-        const isbnCandidates = await searchNdlsForIsbns(titleQuery, authorQuery);
-        if (!isbnCandidates.length) {
-          setSearchMessage("ISBNを見つけられませんでした。タイトルや作者名を短くするか、手入力で追加してください。");
+        const ndlCandidates = await searchNdlsForBooks(titleQuery, authorQuery, signal);
+        if (searchId !== activeSearchId) return;
+        if (!ndlCandidates.length) {
+          setSearchMessage("本が見つかりませんでした。タイトルや作者名を短くするか、手入力で追加してください。");
           return;
         }
 
-        const openBdBooks = await fetchOpenBdBooks(isbnCandidates);
-        if (!openBdBooks.length) {
-          setSearchMessage("ISBN候補は見つかりましたが、openBDで書誌を取得できませんでした。手入力で追加してください。");
-          return;
-        }
+        const books = await enrichBooksWithOpenBd(ndlCandidates, signal);
+        if (searchId !== activeSearchId) return;
+        const hasFallbackOnly = books.every((book) => !book.coverUrl);
 
-        setSearchMessage("");
-        openBdBooks.forEach((book) => renderSearchResult(book));
-      } catch {
+        setSearchMessage(hasFallbackOnly ? "書影がない候補は仮表紙で表示しています。" : "");
+        books.forEach((book) => renderSearchResult(book));
+      } catch (error) {
+        if (error.name === "AbortError" || searchId !== activeSearchId) return;
+        console.error("Book search failed", error);
         setSearchMessage("本を検索できませんでした。通信環境を確認するか、手入力で追加してください。");
       } finally {
-        document.getElementById("searchBooks").disabled = false;
+        if (searchId === activeSearchId) {
+          document.getElementById("searchBooks").disabled = false;
+          activeSearchController = null;
+        }
       }
     }
 
-    async function searchNdlsForIsbns(title, author) {
+    async function searchNdlsForBooks(title, author, signal) {
       const params = new URLSearchParams({
-        cnt: "100",
+        cnt: "250",
         dpid: "iss-ndl-opac"
       });
       if (title) params.set("title", title);
       if (author) params.set("creator", author);
       const url = `https://ndlsearch.ndl.go.jp/api/opensearch?${params.toString()}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error("NDL search failed");
       const xmlText = await response.text();
       const doc = new DOMParser().parseFromString(xmlText, "application/xml");
@@ -1209,35 +1220,107 @@
       const candidates = [];
 
       items.forEach((item) => {
-        const itemTitle = getXmlText(item, "dc:title") || getXmlText(item, "title");
-        const itemText = item.textContent || "";
+        const itemTitle = cleanDisplayText(getXmlText(item, "dc:title") || getXmlText(item, "title"));
+        const itemText = cleanDisplayText(item.textContent || "");
         const creators = Array.from(item.getElementsByTagName("dc:creator"))
-          .map((creator) => creator.textContent || "")
+          .map((creator) => cleanDisplayText(creator.textContent || ""))
           .join(" ");
+        const authorText = cleanDisplayText(getXmlText(item, "author"));
+        const publisher = cleanDisplayText(getXmlText(item, "dc:publisher"));
+        const date = cleanDisplayText(getXmlText(item, "dc:date") || getXmlText(item, "dcterms:issued"));
+        const materialType = detectMaterialType(itemText);
         const identifiers = Array.from(item.getElementsByTagName("dc:identifier"));
+        const isbnValues = [];
         identifiers.forEach((identifier) => {
           const type = identifier.getAttribute("xsi:type") || "";
           if (!type.includes("ISBN")) return;
           const isbn = normalizeIsbn(identifier.textContent || "");
-          if (isbn && !candidates.some((candidate) => candidate.isbn === isbn)) {
-            candidates.push({
-              isbn,
-              score: scoreSearchMatch({
-                title: itemTitle,
-                text: itemText,
-                creators,
-                titleQuery: title,
-                authorQuery: author
-              })
-            });
-          }
+          if (isbn && !isbnValues.includes(isbn)) isbnValues.push(isbn);
         });
+
+        const score = scoreSearchMatch({
+          title: itemTitle,
+          text: itemText,
+          creators: creators || authorText,
+          titleQuery: title,
+          authorQuery: author
+        });
+        if (!itemTitle || score < 10) return;
+
+        const candidateAuthor = pickMatchedAuthor(creators || authorText, itemText, author) || cleanAuthor(creators || authorText);
+        const candidate = {
+          id: createId(),
+          title: itemTitle,
+          author: candidateAuthor,
+          coverId: null,
+          coverUrl: null,
+          isbn: isbnValues[0] || "",
+          publisher,
+          publishedAt: date,
+          materialType,
+          source: "NDLサーチ",
+          status: "unread",
+          createdAt: new Date().toISOString(),
+          score: score + scoreBibliographicQuality({ title: itemTitle, author: candidateAuthor, publisher, materialType, isbn: isbnValues[0] || "" })
+        };
+
+        const duplicateKey = candidate.isbn || `${normalizeSearchText(candidate.title)}:${normalizeSearchText(candidate.author)}:${candidate.publishedAt}`;
+        if (!candidates.some((existing) => existing.searchKey === duplicateKey)) {
+          candidate.searchKey = duplicateKey;
+          candidates.push(candidate);
+        }
+
+        const workCandidate = createMatchedWorkCandidate({
+          queryTitle: title,
+          queryAuthor: author,
+          itemTitle,
+          itemText,
+          creators,
+          authorText,
+          publisher,
+          date
+        });
+        if (workCandidate) upsertCandidate(candidates, workCandidate);
       });
 
       return candidates
-        .sort((a, b) => b.score - a.score)
-        .map((candidate) => candidate.isbn)
-        .slice(0, 20);
+        .sort((a, b) => compareSearchCandidates(a, b, title))
+        .slice(0, 24);
+    }
+
+    function createMatchedWorkCandidate({ queryTitle, queryAuthor, itemTitle, itemText, creators, authorText, publisher, date }) {
+      if (!queryTitle) return null;
+      const normalizedQuery = normalizeSearchText(queryTitle);
+      const normalizedTitle = normalizeSearchText(itemTitle);
+      if (!normalizedQuery || normalizedTitle !== normalizedQuery) return null;
+      const author = pickMatchedAuthor(creators || authorText, itemText, queryAuthor);
+      const materialType = detectMaterialType(itemText);
+
+      return {
+        id: createId(),
+        title: cleanDisplayText(itemTitle || queryTitle),
+        author,
+        coverId: null,
+        coverUrl: null,
+        isbn: "",
+        publisher,
+        publishedAt: date,
+        materialType,
+        source: "NDLサーチ",
+        status: "unread",
+        createdAt: new Date().toISOString(),
+        score: 1200 + scoreBibliographicQuality({ title: itemTitle, author, publisher, materialType, isbn: "" }) + (queryAuthor && normalizeSearchText(author).includes(normalizeSearchText(queryAuthor)) ? 80 : 0),
+        searchKey: `matched:${normalizedQuery}:${normalizeSearchText(author)}`
+      };
+    }
+
+    function upsertCandidate(candidates, candidate) {
+      const index = candidates.findIndex((existing) => existing.searchKey === candidate.searchKey);
+      if (index === -1) {
+        candidates.push(candidate);
+        return;
+      }
+      if (candidate.score > candidates[index].score) candidates[index] = candidate;
     }
 
     function getXmlText(parent, tagName) {
@@ -1264,27 +1347,209 @@
       const normalizedText = normalizeSearchText(candidateText);
       const normalizedQuery = normalizeSearchText(query);
       if (!normalizedQuery) return 0;
-      if (normalizedTitle === normalizedQuery) return 100;
-      if (normalizedTitle.startsWith(normalizedQuery)) return 80;
-      if (normalizedTitle.includes(normalizedQuery)) return 60;
-      if (normalizedText.includes(normalizedQuery)) return 35;
-      return 10;
+      if (normalizedTitle === normalizedQuery) return 1000;
+      if (containsStandaloneTitle(candidateTitle, query)) return 650;
+      if (normalizedTitle.startsWith(normalizedQuery)) return 700;
+      if (normalizedTitle.includes(normalizedQuery)) return 500;
+      if (normalizedText.includes(normalizedQuery)) return 180;
+      return 0;
+    }
+
+    function compareSearchCandidates(a, b, titleQuery) {
+      const query = normalizeSearchText(titleQuery);
+      const rank = (book) => {
+        if (!query) return 1;
+        const title = normalizeSearchText(book.title);
+        const periodical = isPeriodicalCandidate(book);
+        if (title === query && !periodical) return 0;
+        if (containsStandaloneTitle(book.title, titleQuery) && !periodical) return 1;
+        if (title.includes(query) && !periodical) return 2;
+        if (title === query) return 3;
+        if (title.includes(query)) return 4;
+        return 5;
+      };
+      const rankDiff = rank(a) - rank(b);
+      if (rankDiff) return rankDiff;
+      return b.score - a.score;
+    }
+
+    function containsStandaloneTitle(title, query) {
+      const displayTitle = cleanDisplayText(title).normalize("NFKC");
+      const displayQuery = cleanDisplayText(query).normalize("NFKC");
+      if (!displayTitle || !displayQuery) return false;
+      const escaped = displayQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|[\\s『』「」【】（）()［］\\[\\]・:：,，.．、。!！?？/／-])${escaped}($|[\\s『』「」【】（）()［］\\[\\]・:：,，.．、。!！?？/／-])`).test(displayTitle);
+    }
+
+    function detectMaterialType(text) {
+      const value = cleanDisplayText(text);
+      if (/(^|\s)雑誌(\s|$)/.test(value)) return "雑誌";
+      if (/(^|\s)録音資料(\s|$)|オーディオブック|CD/.test(value)) return "録音資料";
+      if (/(^|\s)映像資料(\s|$)|DVD|Blu-ray/.test(value)) return "映像資料";
+      if (/(^|\s)電子資料(\s|$)/.test(value)) return "電子資料";
+      if (/(^|\s)図書(\s|$)/.test(value)) return "図書";
+      return "";
+    }
+
+    function scoreBibliographicQuality(book) {
+      let score = 0;
+      if (book.isbn) score += 90;
+      if (book.materialType === "図書") score += 140;
+      if (book.materialType === "雑誌") score -= 650;
+      if (book.materialType === "録音資料" || book.materialType === "映像資料") score -= 80;
+      if (hasPersonLikeAuthor(book.author)) score += 120;
+      if (!cleanAuthor(book.author)) score -= 120;
+      if (isCorporateLikeAuthor(book.author, book.title, book.publisher)) score -= 180;
+      if (isSecondaryWorkTitle(book.title)) score -= 360;
+      if (isMusicRelatedTitle(book.title)) score -= 360;
+      if (isPhotoOrCatalogTitle(book.title)) score -= 180;
+      return score;
+    }
+
+    function isPeriodicalCandidate(book) {
+      return book.materialType === "雑誌" || isCorporateLikeAuthor(book.author, book.title, book.publisher);
+    }
+
+    function isSecondaryWorkTitle(title) {
+      return /(作品論集|論集|研究|ルーツ|諸相|時代|青春|草稿|展示図録|展|評伝|解説|鑑賞|入門|論考|考察)/.test(cleanDisplayText(title));
+    }
+
+    function isMusicRelatedTitle(title) {
+      return /(合唱|混声|女声|男声|楽譜|うた[:：]|ソング|song|Song|歌曲)/.test(cleanDisplayText(title));
+    }
+
+    function isPhotoOrCatalogTitle(title) {
+      return /(写真集|図録|カタログ|catalog|Catalog)/.test(cleanDisplayText(title));
+    }
+
+    function hasPersonLikeAuthor(author) {
+      const value = cleanAuthor(author);
+      if (!value) return false;
+      if (isCorporateLikeAuthor(value, "", "")) return false;
+      return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z]/u.test(value);
+    }
+
+    function isCorporateLikeAuthor(author, title, publisher) {
+      const value = normalizeSearchText(author);
+      if (!value) return false;
+      const normalizedTitle = normalizeSearchText(title);
+      const normalizedPublisher = normalizeSearchText(publisher);
+      if (normalizedTitle && value.includes(normalizedTitle) && normalizedPublisher && normalizedPublisher.includes(normalizedTitle)) return true;
+      return /(社|協会|会|委員会|編集部|研究会|出版|新聞|雑誌|財団|法人|株式会社|有限会社)$/.test(value);
     }
 
     function normalizeSearchText(value) {
       return String(value)
+        .replace(/<[^>]*>/g, " ")
         .normalize("NFKC")
         .replace(/\s+/g, "")
-        .replace(/[『』「」【】（）()［］\[\]・:：,，.．]/g, "")
+        .replace(/[『』「」【】（）()［］\[\]・:：,，.．、。!！?？]/g, "")
         .toLowerCase();
     }
 
-    async function fetchOpenBdBooks(isbns) {
+    function cleanDisplayText(value) {
+      return String(value || "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, "\"")
+        .replace(/&#39;/g, "'")
+        .replace(/https?:\/\/\S+/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function cleanAuthor(value) {
+      const text = cleanDisplayText(value)
+        .replace(/\b\d{4}\s*-\s*(?:\d{4})?\b/g, "")
+        .replace(/\s+(?:NDC(?:\(\d+\))?[:：].*|図書\s+.*|紙\s+.*|電子資料\s+.*|録音資料\s+.*|映像資料\s+.*|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+.*)$/i, "")
+        .replace(/\s*(?:著|作|原作|原|文|編著|編|訳|監修|編集|校注|解説|脚本|監督)\s*/g, " ")
+        .replace(/[［\[]\s*[］\]]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!text) return "";
+
+      const commaParts = text.split(",").map((part) => part.trim()).filter(Boolean);
+      const names = [];
+      if (commaParts.length > 1) {
+        for (let i = 0; i < commaParts.length; i += 1) {
+          const current = commaParts[i];
+          const next = commaParts[i + 1] || "";
+          if (!current || /^\d{4}/.test(current)) continue;
+          if (next && !/^\d{4}/.test(next)) {
+            names.push(`${current} ${next}`.trim());
+            i += 1;
+          } else {
+            names.push(current);
+          }
+        }
+      } else {
+        names.push(...text.split(/[／/;；、]/).map((part) => part.trim()));
+      }
+
+      return names
+        .map((name) => name.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .filter((name) => !/^(責任表示|シリーズ名|NDC)$/.test(name))
+        .filter((name, index, parts) => parts.indexOf(name) === index)
+        .slice(0, 3)
+        .join(", ");
+    }
+
+    function pickMatchedAuthor(creators, text, queryAuthor) {
+      const cleanedCreators = cleanDisplayText(creators);
+      const cleanedText = cleanDisplayText(text);
+      if (queryAuthor && normalizeSearchText(`${cleanedCreators} ${cleanedText}`).includes(normalizeSearchText(queryAuthor))) {
+        return queryAuthor;
+      }
+      const responsibility = extractResponsibility(cleanedText);
+      return pickPrimaryAuthor(responsibility) || cleanAuthor(cleanedCreators);
+    }
+
+    function extractResponsibility(text) {
+      const match = cleanDisplayText(text).match(/責任表示[:：]\s*(.+?)(?:\s+(?:シリーズ名|NDC|ISBN|出版者|出版年月日)[:：]|$)/);
+      return match ? match[1].trim() : "";
+    }
+
+    function pickPrimaryAuthor(text) {
+      const cleaned = cleanDisplayText(text);
+      if (!cleaned) return "";
+      const rolePriority = ["著", "作", "原作", "原", "文", "編著", "校注", "脚本", "監督", "訳", "編", "監修", "編集", "解説"];
+      for (const role of rolePriority) {
+        const match = cleaned.match(new RegExp(`([^,，／/;；、]+?)\\s*${role}(?:\\s|$|[,，／/;；、])`));
+        if (match) return cleanAuthor(match[1]);
+      }
+      return cleanAuthor(cleaned);
+    }
+
+    async function enrichBooksWithOpenBd(candidates, signal) {
+      const isbnCandidates = candidates.filter((book) => book.isbn);
+      if (!isbnCandidates.length) return candidates;
+      const openBdBooks = await fetchOpenBdBooks(isbnCandidates.map((book) => book.isbn), signal);
+      const openBdByIsbn = new Map(openBdBooks.map((book) => [book.isbn, book]));
+
+      return candidates.map((candidate) => {
+        const openBdBook = openBdByIsbn.get(candidate.isbn);
+        if (!openBdBook) return candidate;
+        return {
+          ...candidate,
+          title: openBdBook.title || candidate.title,
+          author: openBdBook.author || candidate.author,
+          coverUrl: openBdBook.coverUrl || candidate.coverUrl,
+          publisher: openBdBook.publisher || candidate.publisher,
+          source: "openBD"
+        };
+      });
+    }
+
+    async function fetchOpenBdBooks(isbns, signal) {
       const booksByIsbn = new Map();
       for (let i = 0; i < isbns.length; i += 10) {
         const chunk = isbns.slice(i, i + 10);
         const url = `https://api.openbd.jp/v1/get?isbn=${encodeURIComponent(chunk.join(","))}`;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal });
         if (!response.ok) throw new Error("openBD failed");
         const data = await response.json();
         data.filter(Boolean).forEach((item) => {
@@ -1292,7 +1557,7 @@
           if (book && !booksByIsbn.has(book.isbn)) booksByIsbn.set(book.isbn, book);
         });
       }
-      return Array.from(booksByIsbn.values()).slice(0, 10);
+      return Array.from(booksByIsbn.values());
     }
 
     function normalizeIsbn(value) {
@@ -1316,14 +1581,22 @@
       return {
         id: createId(),
         title,
-        author: summary.author || authors.join(", ") || "",
+        author: cleanAuthor(summary.author || authors.join(", ") || ""),
         coverId: null,
-        coverUrl: summary.cover || null,
+        coverUrl: normalizeCoverUrl(summary.cover),
         isbn,
         publisher: summary.publisher || "",
         status: "unread",
         createdAt: new Date().toISOString()
       };
+    }
+
+    function normalizeCoverUrl(value) {
+      const url = String(value || "").trim();
+      if (!url) return null;
+      if (url.startsWith("//")) return `https:${url}`;
+      if (url.startsWith("http://cover.openbd.jp/")) return url.replace("http://", "https://");
+      return url;
     }
 
     function renderSearchResult(book) {
@@ -1337,7 +1610,13 @@
       title.textContent = book.title;
       const sub = document.createElement("p");
       sub.className = "card-sub";
-      sub.textContent = `${book.author || "著者不明"}${book.publisher ? ` / ${book.publisher}` : ""}${book.isbn ? ` / ISBN ${book.isbn}` : ""}`;
+      sub.textContent = [
+        book.author || "著者不明",
+        book.publisher || "",
+        book.publishedAt || "",
+        book.isbn ? `ISBN ${book.isbn}` : "ISBNなし",
+        book.coverUrl ? "書影あり" : "仮表紙"
+      ].filter(Boolean).join(" / ");
       meta.append(title, sub);
       row.appendChild(meta);
 
